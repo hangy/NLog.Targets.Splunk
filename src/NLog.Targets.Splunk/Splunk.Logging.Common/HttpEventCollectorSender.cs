@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @copyright
  *
  * Copyright 2013-2015 Splunk, Inc.
@@ -134,6 +134,7 @@ namespace Splunk.Logging
         private HttpEventCollectorFormatter formatter = null;
         // counter for bookkeeping the async tasks 
         private long activeAsyncTasksCount = 0;
+        private bool applyHttpVersion10Hack = false;
 
         /// <summary>
         /// On error callbacks.
@@ -152,6 +153,7 @@ namespace Splunk.Logging
         /// <param name="batchSizeBytes">Batch max size.</param>
         /// <param name="batchSizeCount">Max number of individual events in batch.</param>
         /// <param name="ignoreSslErrors">Server validation callback should always return true</param>
+        /// <param name="useProxy">Default web proxy is used if set to true; otherwise, no proxy is used</param>
         /// <param name="middleware">HTTP client middleware. This allows to plug an HttpClient handler that
         /// intercepts logging HTTP traffic.</param>
         /// <param name="formatter">The formatter.</param>
@@ -168,9 +170,11 @@ namespace Splunk.Logging
             int batchSizeBytes, 
             int batchSizeCount, 
             bool ignoreSslErrors,
+            ProxyConfiguration proxy,
             int maxConnectionsPerServer,
             HttpEventCollectorMiddleware middleware,
-            HttpEventCollectorFormatter formatter = null)
+            HttpEventCollectorFormatter formatter = null,
+            bool httpVersion10Hack = false)
         {
             NLog.Common.InternalLogger.Debug("Initializing Splunk HttpEventCollectorSender");
 
@@ -188,6 +192,7 @@ namespace Splunk.Logging
             this.channel = channel;
             this.middleware = middleware;
             this.formatter = formatter;
+            this.applyHttpVersion10Hack = httpVersion10Hack;
 
             // special case - if batch interval is specified without size and count
             // they are set to "infinity", i.e., batch may have any size 
@@ -216,8 +221,8 @@ namespace Splunk.Logging
             // setup HTTP client
             try
             {
-                var httpMessageHandler = ignoreSslErrors ? BuildHttpMessageHandler(ignoreSslErrors, maxConnectionsPerServer) : null;
-                httpClient = httpMessageHandler != null ? new HttpClient(httpMessageHandler) : new HttpClient();
+                var httpMessageHandler = BuildHttpMessageHandler(ignoreSslErrors, proxy, maxConnectionsPerServer);
+                httpClient = new HttpClient(httpMessageHandler);
             }
             catch
             {
@@ -227,6 +232,13 @@ namespace Splunk.Logging
 
             // setup splunk header token
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(AuthorizationHeaderScheme, token);
+
+            if (this.applyHttpVersion10Hack)
+            {
+                httpClient.BaseAddress = uri;
+                httpClient.DefaultRequestHeaders.ConnectionClose = false;
+                httpClient.DefaultRequestHeaders.Add("Connection", "keep-alive");
+            }
 
             // setup splunk channel request header 
             if (!string.IsNullOrWhiteSpace(channel))
@@ -239,8 +251,9 @@ namespace Splunk.Logging
         /// Builds the HTTP message handler.
         /// </summary>
         /// <param name="ignoreSslErrors">if set to <c>true</c> [ignore SSL errors].</param>
+        /// <param name="proxy">ProxyConfiguration</param>
         /// <returns></returns>
-        private HttpMessageHandler BuildHttpMessageHandler(bool ignoreSslErrors, int maxConnectionsPerServer)
+        private HttpMessageHandler BuildHttpMessageHandler(bool ignoreSslErrors, ProxyConfiguration proxy, int maxConnectionsPerServer)
         {
 #if NET45
             
@@ -249,17 +262,28 @@ namespace Splunk.Logging
             {
                 httpMessageHandler.ServerCertificateValidationCallback = IgnoreServerCertificateCallback;
             }
+
 #else
             var httpMessageHandler = new HttpClientHandler();
             if (ignoreSslErrors) 
             {
                 httpMessageHandler.ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => IgnoreServerCertificateCallback(msg, cert, chain, errors);
             }
+
             if (maxConnectionsPerServer > 0)
             {
                 httpMessageHandler.MaxConnectionsPerServer = maxConnectionsPerServer;
             }
 #endif
+            httpMessageHandler.UseProxy = proxy.UseProxy;
+            if (proxy.UseProxy && !string.IsNullOrWhiteSpace(proxy.ProxyUrl))
+            {
+                httpMessageHandler.Proxy = new WebProxy(new Uri(proxy.ProxyUrl));
+                if (!String.IsNullOrWhiteSpace(proxy.ProxyUser) && !String.IsNullOrWhiteSpace(proxy.ProxyPassword))
+                {
+                    httpMessageHandler.Proxy.Credentials = new NetworkCredential(proxy.ProxyUser, proxy.ProxyPassword);
+                }
+            }
             return httpMessageHandler;
         }
 
@@ -490,6 +514,16 @@ namespace Splunk.Logging
                 {
                     HttpContent content = new ByteArrayContent(serializedEvents);
                     content.Headers.ContentType = HttpContentHeaderValue;
+
+                    if (this.applyHttpVersion10Hack)
+                    {
+                        HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, HttpEventCollectorPath);
+                        request.Version = HttpVersion.Version10;
+                        request.Content = content;
+
+                        return httpClient.SendAsync(request);
+                    }
+
                     return httpClient.PostAsync(httpEventCollectorEndpointUri, content);
                 };
                 HttpEventCollectorHandler postEvents = (t, s) =>
