@@ -59,10 +59,10 @@ namespace Splunk.Logging
                 string sourceType = null, 
                 string host = null)                
             {
-                this.Index = index;
-                this.Source = source;
-                this.SourceType = sourceType;
-                this.Host = host;
+                Index = index;
+                Source = source;
+                SourceType = sourceType;
+                Host = host;
             }
         }
 
@@ -122,12 +122,12 @@ namespace Splunk.Logging
             /// <param name="properties">Event properties.</param>
             internal LoggerEvent(string id, string level, string messageTemplate, string renderedMessage, object exception, object properties) : this()
             {
-                this.Id = id;
-                this.Level = level;
-                this.MessageTemplate = messageTemplate;
-                this.RenderedMessage = renderedMessage;
-                this.Exception = exception;
-                this.Properties = properties;
+                Id = id;
+                Level = level;
+                MessageTemplate = messageTemplate;
+                RenderedMessage = renderedMessage;
+                Exception = exception;
+                Properties = properties;
             }
         }
 

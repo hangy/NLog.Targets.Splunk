@@ -4,6 +4,8 @@ using NLog.Layouts;
 using Splunk.Logging;
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace NLog.Targets.Splunk
 {
@@ -12,7 +14,7 @@ namespace NLog.Targets.Splunk
     /// </summary>
     /// <seealso cref="NLog.Targets.TargetWithContext" />
     [Target("SplunkHttpEventCollector")]
-    public sealed class SplunkHttpEventCollector : TargetWithContext
+    public sealed class SplunkHttpEventCollector : AsyncTaskTarget
     {
         private HttpEventCollectorSender _hecSender;
 
@@ -65,30 +67,6 @@ namespace NLog.Targets.Splunk
         /// The Splunk HTTP Event Collector data channel.
         /// </value>
         public Layout Channel { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of retries on error.
-        /// </summary>
-        /// <value>
-        /// The number of retries on error.
-        /// </value>
-        public int RetriesOnError { get; set; } = 0;
-
-        /// <summary>
-        /// Gets or sets the number of bytes to include before sending a batch
-        /// </summary>
-        /// <value>
-        /// The batch size in bytes.
-        /// </value>
-        public int BatchSizeBytes { get; set; } = 0;    // 0 = No batching
-
-        /// <summary>
-        /// Gets or sets the number of logevents to include before sending a batch
-        /// </summary>
-        /// <value>
-        /// The batch size count.
-        /// </value>
-        public int BatchSizeCount { get; set; } = 0;    // 0 = No batching
 
         /// <summary>
         /// Gets or sets whether to include positional parameters
@@ -153,7 +131,7 @@ namespace NLog.Targets.Splunk
         protected override void InitializeTarget()
         {
             base.InitializeTarget();
-            NLog.Common.InternalLogger.Debug("Initializing SplunkHttpEventCollector");
+            InternalLogger.Debug("Initializing SplunkHttpEventCollector");
 
             _metaData.Clear();
 
@@ -180,13 +158,9 @@ namespace NLog.Targets.Splunk
                 channel,                                                                            // Splunk HEC data channel *GUID*
                 GetMetaData(index, source, sourceType),                                             // Metadata
                 HttpEventCollectorSender.SendMode.Sequential,                                       // Sequential sending to keep message in order
-                BatchSizeBytes == 0 && BatchSizeCount == 0 ? 0 : 250,                               // BatchInterval - Set to 0 to disable
-                BatchSizeBytes,                                                                     // BatchSizeBytes - Set to 0 to disable
-                BatchSizeCount,                                                                     // BatchSizeCount - Set to 0 to disable
                 IgnoreSslErrors,                                                                    // Enable Ssl Error ignore for self singed certs *BOOL*
                 UseProxy,                                                                           // UseProxy - Set to false to disable
                 MaxConnectionsPerServer,
-                new HttpEventCollectorResendMiddleware(RetriesOnError).Plugin,                      // Resend Middleware with retry
                 httpVersion10Hack: UseHttpVersion10Hack
             );
             _hecSender.OnError += (e) => { InternalLogger.Error(e, "SplunkHttpEventCollector(Name={0}): Failed to send LogEvents", Name); };
@@ -208,13 +182,7 @@ namespace NLog.Targets.Splunk
             }
         }
 
-        /// <summary>
-        /// Writes the specified log event information.
-        /// </summary>
-        /// <param name="logEventInfo">The log event information.</param>
-        /// <exception cref="System.ArgumentNullException">logEventInfo</exception>
-        /// <exception cref="NLogRuntimeException">SplunkHttpEventCollector SendEventToServer() called before InitializeTarget()</exception>
-        protected override void Write(LogEventInfo logEventInfo)
+        private void AddToBatch(LogEventInfo logEventInfo, HttpEventCollectorEventInfoBatch batch)
         {
             // Sanity check for LogEventInfo
             if (logEventInfo == null)
@@ -247,28 +215,7 @@ namespace NLog.Targets.Splunk
 
             // Send the event to splunk
             string renderedMessage = RenderLogEvent(Layout, logEventInfo);
-            _hecSender.Send(logEventInfo.TimeStamp, null, logEventInfo.Level.Name, logEventInfo.Message, renderedMessage, logEventInfo.Exception, properties, metaData);
-            if (BatchSizeBytes == 0 && BatchSizeCount == 0)
-            {
-                _hecSender.FlushSync();
-            }
-        }
-
-        /// <summary>
-        /// Flush any pending log messages asynchronously (in case of asynchronous targets).
-        /// </summary>
-        /// <param name="asyncContinuation">The asynchronous continuation.</param>
-        protected override void FlushAsync(AsyncContinuation asyncContinuation)
-        {
-            try
-            {
-                _hecSender?.FlushSync();
-                asyncContinuation(null);
-            }
-            catch (Exception ex)
-            {
-                asyncContinuation(ex);
-            }
+            batch.AddEvent(logEventInfo.TimeStamp, null, logEventInfo.Level.Name, logEventInfo.Message, renderedMessage, logEventInfo.Exception, properties, metaData);
         }
 
         /// <summary>
@@ -316,8 +263,31 @@ namespace NLog.Targets.Splunk
             }
             catch (Exception ex)
             {
-                NLog.Common.InternalLogger.Warn(ex, "SplunkHttpEventCollector: Failed to lookup {0}", lookupType);
+                InternalLogger.Warn(ex, "SplunkHttpEventCollector: Failed to lookup {0}", lookupType);
                 return null;
+            }
+        }
+
+        protected override Task WriteAsyncTask(LogEventInfo logEvent, CancellationToken cancellationToken)
+        {
+            using (HttpEventCollectorEventInfoBatch batch = _hecSender.StartBatch())
+            {
+                AddToBatch(logEvent, batch);
+                return batch.Send(cancellationToken);
+            }
+        }
+
+        protected override Task WriteAsyncTask(IList<LogEventInfo> logEvents, CancellationToken cancellationToken)
+        {
+            using (HttpEventCollectorEventInfoBatch batch = _hecSender.StartBatch())
+            {
+                foreach (LogEventInfo logEvent in logEvents)
+                {
+                    AddToBatch(logEvent, batch);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                return batch.Send(cancellationToken);
             }
         }
     }
