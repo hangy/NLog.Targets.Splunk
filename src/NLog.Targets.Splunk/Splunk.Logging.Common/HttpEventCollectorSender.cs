@@ -289,6 +289,8 @@ namespace Splunk.Logging
 
             return responseCode;
         }
+
+        /// <summary>
         /// Ignores the server certificate callback.
         /// </summary>
         /// <param name="sender">The sender.</param>
