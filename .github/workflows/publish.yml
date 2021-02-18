@@ -1,0 +1,32 @@
+name: publish to nuget
+on:
+  push:
+    branches:
+      - build
+jobs:
+  publish:
+    name: build, pack & publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: 5.0.103
+
+      - name: Nerdbank.GitVersioning
+        id: nbgv
+        uses: dotnet/nbgv@v0.4.0
+
+      - name: publish on version change
+        id: publish_nuget
+        uses: rohith/publish-nuget@v2
+        with:
+          PROJECT_FILE_PATH: src/NLog.Targets.Splunk/NLog.Targets.Splunk.csproj
+          PACKAGE_NAME: NLog.Targets.Splunk.Simple
+          VERSION_STATIC: ${{ steps.nbgv.outputs.SemVer2 }}
+          NUGET_KEY: ${{secrets.NUGET_API_KEY}}
+          INCLUDE_SYMBOLS: true
