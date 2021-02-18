@@ -1,7 +1,9 @@
-NLog.Targets.Splunk
-===================
+NLog.Targets.Splunk.Simple
+==========================
 
-NLog.Targets.Splunk is a [Splunk HTTP Event Collector](http://dev.splunk.com/view/event-collector/SP-CAAAE7F) target for [NLog](http://nlog-project.org/)
+NLog.Targets.Splunk.Simple is a [Splunk HTTP Event Collector](http://dev.splunk.com/view/event-collector/SP-CAAAE7F) target for [NLog](http://nlog-project.org/).
+Unlike [the original](https://github.com/AlanBarber/NLog.Targets.Splunk), this fork does not batch or retry the HTTP requests on it's own, but rather delegates
+that to NLog, so the standard wrappers can be used.
 
 [![NuGet version](https://badge.fury.io/nu/NLog.Targets.Splunk.Simple.svg)](https://badge.fury.io/nu/NLog.Targets.Splunk.Simple)
 
@@ -15,7 +17,7 @@ Then configure the SplunkHttpEventCollector with `ServerUrl` and `Token`:
 <?xml version="1.0" encoding="utf-8" ?>
 <nlog xmlns="http://www.nlog-project.org/schemas/NLog.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" >
   <extensions>
-    <add assembly="NLog.Targets.Splunk" />
+    <add assembly="NLog.Targets.Splunk.Simple" />
   </extensions>
   <targets async="true">
     <target name="Splunk"

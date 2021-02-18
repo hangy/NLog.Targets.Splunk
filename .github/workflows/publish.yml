@@ -25,8 +25,7 @@ jobs:
         id: publish_nuget
         uses: rohith/publish-nuget@v2
         with:
-          PROJECT_FILE_PATH: src/NLog.Targets.Splunk/NLog.Targets.Splunk.csproj
-          PACKAGE_NAME: NLog.Targets.Splunk.Simple
+          PROJECT_FILE_PATH: src/NLog.Targets.Splunk.Simple/NLog.Targets.Splunk.Simple.csproj
           VERSION_STATIC: ${{ steps.nbgv.outputs.SemVer2 }}
           NUGET_KEY: ${{secrets.NUGET_API_KEY}}
           INCLUDE_SYMBOLS: true

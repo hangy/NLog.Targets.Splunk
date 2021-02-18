@@ -2,10 +2,10 @@
 
   <PropertyGroup>
     <TargetFrameworks>net45;net472;netstandard2.0</TargetFrameworks>
-    <Title>NLog.Targets.Splunk</Title>
+    <Title>NLog.Targets.Splunk.Simple</Title>
     <Description>A NLog target for Splunk's Http Event Collector (HEC) Sender</Description>
     <PackageTags>nlog;nlog-target;splunk;splunk-enterprise;logging</PackageTags>
-	<IsPackable>true</IsPackable>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <!--common NuGet package refs -->
