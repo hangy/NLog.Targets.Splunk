@@ -15,7 +15,7 @@
 
     <Authors>Alan Barber</Authors>
     <CurrentYear>$([System.DateTime]::Now.ToString(yyyy))</CurrentYear>
-    <Copyright>Copyright (c) $(CurrentYear) Alan Barber, Copyright 2013-2015 Splunk, Inc. </Copyright>
+    <Copyright>Copyright (c) 2017-$(CurrentYear) Alan Barber, Copyright 2013-2015 Splunk, Inc. </Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
 	<PackageIcon>nugeticon.png</PackageIcon>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>

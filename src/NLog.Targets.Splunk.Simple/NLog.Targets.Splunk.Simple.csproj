@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net45;net472;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net45;net462;net472;net48;netstandard2.0;netstandard2.1;netcoreapp3.1;net5.0</TargetFrameworks>
     <Title>NLog.Targets.Splunk.Simple</Title>
     <Description>A NLog target for Splunk's Http Event Collector (HEC) Sender</Description>
     <PackageTags>nlog;nlog-target;splunk;splunk-enterprise;logging</PackageTags>
@@ -10,13 +10,31 @@
 
   <!--common NuGet package refs -->
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="NLog" Version="4.7.7" />
   </ItemGroup>
+
+  <!-- .NET 5.0 config -->
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'net5.0' ">
+    <AssemblyTitle>NLog.Targets.Splunk .NET 5.0</AssemblyTitle>
+    <DefineConstants>NET50</DefineConstants>
+  </PropertyGroup>
+
+  <!--.NET Core 3.1 config -->
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'netcoreapp3.1' ">
+    <AssemblyTitle>NLog.Targets.Splunk .NET Core 3.1</AssemblyTitle>
+    <DefineConstants>NETCORE;NETSTANDARD</DefineConstants>
+  </PropertyGroup>
 
   <!--.NET Standard 2.0 config -->
   <PropertyGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
     <AssemblyTitle>NLog.Targets.Splunk .NET Standard 2.0</AssemblyTitle>
+    <DefineConstants>NETCORE;NETSTANDARD</DefineConstants>
+  </PropertyGroup>
+
+  <!--.NET Standard 2.1 config -->
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'netstandard2.1' ">
+    <AssemblyTitle>NLog.Targets.Splunk .NET Standard 2.1</AssemblyTitle>
     <DefineConstants>NETCORE;NETSTANDARD</DefineConstants>
   </PropertyGroup>
 
@@ -26,12 +44,25 @@
     <DefineConstants>NETFULL</DefineConstants>
   </PropertyGroup>
 
+  <!-- .NET 4.6.2 config -->
+  <PropertyGroup Condition=" '$(TargetFramework)'=='net462' ">
+    <AssemblyTitle>NLog.Targets.Splunk .NET 4.6.2</AssemblyTitle>
+    <DefineConstants>NETFULL</DefineConstants>
+  </PropertyGroup>
+
+  <!-- .NET 4.7.2 config -->
   <PropertyGroup Condition=" '$(TargetFramework)'=='net472' ">
     <AssemblyTitle>NLog.Targets.Splunk .NET 4.7.2</AssemblyTitle>
     <DefineConstants>NETFULL</DefineConstants>
   </PropertyGroup>
 
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net45' or '$(TargetFramework)' == 'net472' ">
+  <!--.NET 4.8 config -->
+  <PropertyGroup Condition=" '$(TargetFramework)'=='net48' ">
+    <AssemblyTitle>NLog.Targets.Splunk .NET 4.8</AssemblyTitle>
+    <DefineConstants>NETFULL</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" $(TargetFramework.StartsWith('net4')) ">
     <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />

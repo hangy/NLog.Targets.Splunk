@@ -26,6 +26,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+
 // ReSharper disable CheckNamespace
 
 namespace Splunk.Logging
@@ -132,8 +133,10 @@ namespace Splunk.Logging
         /// <param name="metadata">Logger metadata.</param>
         /// <param name="sendMode">Send mode of the events.</param>
         /// <param name="ignoreSslErrors">Server validation callback should always return true</param>
-        /// <param name="useProxy">Default web proxy is used if set to true; otherwise, no proxy is used</param>
+        /// <param name="proxyConfig">Default web proxy is used if set to true; otherwise, no proxy is used</param>
+        /// <param name="maxConnectionsPerServer"></param>
         /// <param name="formatter">The formatter.</param>
+        /// <param name="httpVersion10Hack">Fix for http version 1.0 servers</param>
         /// <remarks>
         /// Zero values for the batching params mean that batching is off.
         /// </remarks>
@@ -144,7 +147,7 @@ namespace Splunk.Logging
             HttpEventCollectorEventInfo.Metadata metadata,
             SendMode sendMode,
             bool ignoreSslErrors,
-            bool useProxy,
+            ProxyConfiguration proxyConfig,
             int maxConnectionsPerServer,
             HttpEventCollectorFormatter formatter = null,
             bool httpVersion10Hack = false)
@@ -165,7 +168,7 @@ namespace Splunk.Logging
             // setup HTTP client
             try
             {
-                var httpMessageHandler = BuildHttpMessageHandler(ignoreSslErrors, useProxy, maxConnectionsPerServer);
+                var httpMessageHandler = BuildHttpMessageHandler(ignoreSslErrors, maxConnectionsPerServer, proxyConfig);
                 httpClient = new HttpClient(httpMessageHandler);
             }
             catch
@@ -195,32 +198,42 @@ namespace Splunk.Logging
         /// Builds the HTTP message handler.
         /// </summary>
         /// <param name="ignoreSslErrors">if set to <c>true</c> [ignore SSL errors].</param>
+        /// <param name="maxConnectionsPerServer"></param>
+        /// <param name="proxyConfig"></param>
         /// <returns></returns>
-        private HttpMessageHandler BuildHttpMessageHandler(bool ignoreSslErrors, bool useProxy, int maxConnectionsPerServer)
+        private HttpMessageHandler BuildHttpMessageHandler(bool ignoreSslErrors, int maxConnectionsPerServer, ProxyConfiguration proxyConfig)
         {
-#if NET45
-
+#if NET45 || NET462
+            // Uses the WebRequestHandler for .NET 4.5 - 4.7.0
             var httpMessageHandler = new WebRequestHandler();
             if (ignoreSslErrors)
             {
                 httpMessageHandler.ServerCertificateValidationCallback = IgnoreServerCertificateCallback;
             }
-
-            httpMessageHandler.UseProxy = useProxy;
 #else
+            // Uses the new and improved HttpClientHandler() for .NET 4.7.1+ and .NET Standard 2.0+
             var httpMessageHandler = new HttpClientHandler();
             if (ignoreSslErrors) 
             {
                 httpMessageHandler.ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => IgnoreServerCertificateCallback(msg, cert, chain, errors);
             }
 
-            httpMessageHandler.UseProxy = useProxy;
-
             if (maxConnectionsPerServer > 0)
             {
                 httpMessageHandler.MaxConnectionsPerServer = maxConnectionsPerServer;
             }
 #endif
+            // Setup proxy
+            httpMessageHandler.UseProxy = proxyConfig.UseProxy;
+            if (proxyConfig.UseProxy && !string.IsNullOrWhiteSpace(proxyConfig.ProxyUrl))
+            {
+                httpMessageHandler.Proxy = new WebProxy(new Uri(proxyConfig.ProxyUrl));
+                if (!String.IsNullOrWhiteSpace(proxyConfig.ProxyUser) && !String.IsNullOrWhiteSpace(proxyConfig.ProxyPassword))
+                {
+                    httpMessageHandler.Proxy.Credentials = new NetworkCredential(proxyConfig.ProxyUser, proxyConfig.ProxyPassword);
+                }
+            }
+
             return httpMessageHandler;
         }
 

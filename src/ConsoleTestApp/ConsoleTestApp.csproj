@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\NLog.Targets.Splunk\NLog.Targets.Splunk.Simple.csproj" />
+    <ProjectReference Include="..\NLog.Targets.Splunk.Simple\NLog.Targets.Splunk.Simple.csproj" />
   </ItemGroup>
 
 </Project>

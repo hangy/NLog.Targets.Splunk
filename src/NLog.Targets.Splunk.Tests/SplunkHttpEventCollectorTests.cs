@@ -1,8 +1,7 @@
-﻿using NLog.Config;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Dynamic;
-using NLog.MessageTemplates;
+using NLog.Config;
+using NLog.Targets.Splunk.Simple;
 using Xunit;
 
 namespace NLog.Targets.Splunk.Tests
@@ -34,7 +33,7 @@ namespace NLog.Targets.Splunk.Tests
             LogManager.ReconfigExistingLoggers();
 
             // Step 6. Create logger
-            _logger = NLog.LogManager.GetCurrentClassLogger();
+            _logger = LogManager.GetCurrentClassLogger();
         }
 
         private object CreateTestPropertyObjects()

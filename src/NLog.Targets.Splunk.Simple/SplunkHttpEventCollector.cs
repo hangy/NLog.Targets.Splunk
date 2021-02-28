@@ -1,4 +1,4 @@
-﻿using NLog.Common;
+﻿﻿using NLog.Common;
 using NLog.Config;
 using NLog.Layouts;
 using Splunk.Logging;
@@ -90,6 +90,11 @@ namespace NLog.Targets.Splunk.Simple
         /// <value>0 = Use default limit. Default = 10</value>
         public int MaxConnectionsPerServer { get; set; } = 10;
 
+        /// <summary>
+        /// Fix for connecting to server running HTTP Version 1.0
+        /// </summary>
+        /// <value>
+        /// </value>
         public bool UseHttpVersion10Hack { get; set; } = false;
 
         /// <summary>
@@ -99,6 +104,23 @@ namespace NLog.Targets.Splunk.Simple
         /// <c>true</c> = use default web proxy. <c>false</c> = use no proxy. Default is <c>true</c> 
         /// </value>
         public bool UseProxy { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets Proxy URL
+        /// <value>Default is empty. URL must include protocol and port, i.e. <code>http://proxy:5555/</code>.
+        /// If no URL specified, the default system proxy will be used, unless UseProxy is set to false.</value>
+        /// </summary>
+        public Layout ProxyUrl { get; set; } = String.Empty;
+
+        /// <summary>
+        /// Gets or set user name to use for authentication with proxy
+        /// </summary>
+        public Layout ProxyUser { get; set; } = String.Empty;
+
+        /// <summary>
+        /// Gets or sets user password to use for authentication with proxy
+        /// </summary>
+        public Layout ProxyPassword { get; set; } = String.Empty;
 
         /// <summary>
         /// Configuration of additional properties to include with each LogEvent (Ex. ${logger}, ${machinename}, ${threadid} etc.)
@@ -147,6 +169,15 @@ namespace NLog.Targets.Splunk.Simple
                 throw new NLogConfigurationException("SplunkHttpEventCollector Token is not set!");
             }
 
+            var proxyConfig = UseProxy
+                ? new ProxyConfiguration
+                {
+                    ProxyUrl = RenderLogEvent(ProxyUrl, LogEventInfo.CreateNullEvent()),
+                    ProxyUser = RenderLogEvent(ProxyUser, LogEventInfo.CreateNullEvent()),
+                    ProxyPassword = RenderLogEvent(ProxyPassword, LogEventInfo.CreateNullEvent())
+                }
+                : new ProxyConfiguration { UseProxy = false };
+
             var channel = RenderLogEvent(Channel, LogEventInfo.CreateNullEvent());
             var index = RenderLogEvent(Index, LogEventInfo.CreateNullEvent());
             var source = RenderLogEvent(Source, LogEventInfo.CreateNullEvent());
@@ -159,8 +190,8 @@ namespace NLog.Targets.Splunk.Simple
                 GetMetaData(index, source, sourceType),                                             // Metadata
                 HttpEventCollectorSender.SendMode.Sequential,                                       // Sequential sending to keep message in order
                 IgnoreSslErrors,                                                                    // Enable Ssl Error ignore for self singed certs *BOOL*
-                UseProxy,                                                                           // UseProxy - Set to false to disable
-                MaxConnectionsPerServer,
+                proxyConfig,                                                                        // Proxy Config - Set to false to disable
+                MaxConnectionsPerServer,                                                            // MaxConnectionsPerServer
                 httpVersion10Hack: UseHttpVersion10Hack
             );
             _hecSender.OnError += (e) => { InternalLogger.Error(e, "SplunkHttpEventCollector(Name={0}): Failed to send LogEvents", Name); };
@@ -221,7 +252,6 @@ namespace NLog.Targets.Splunk.Simple
         /// <summary>
         /// Gets the meta data.
         /// </summary>
-        /// <param name="loggerName">Name of the logger.</param>
         /// <returns></returns>
         private HttpEventCollectorEventInfo.Metadata GetMetaData(string index, string source, string sourcetype)
         {
