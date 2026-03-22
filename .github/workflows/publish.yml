@@ -12,10 +12,10 @@ jobs:
         with:
           fetch-depth: 0 # avoid shallow clone so nbgv can do its work.
 
-      - name: Setup dotnet
-        uses: actions/setup-dotnet@v1
+      - name: Setup dotnet (use global.json)
+        uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: 5.0.103
+          global-json-file: true
 
       - name: Nerdbank.GitVersioning
         id: nbgv
